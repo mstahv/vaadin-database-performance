@@ -3,9 +3,6 @@ package io.seventytwo.demo.views.order;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.data.provider.CallbackDataProvider;
-import com.vaadin.flow.data.provider.ConfigurableFilterDataProvider;
-import com.vaadin.flow.data.provider.DataProvider;
 import com.vaadin.flow.data.value.ValueChangeMode;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -20,27 +17,23 @@ import static com.vaadin.flow.spring.data.VaadinSpringDataHelpers.toSpringDataSo
 @PageTitle("Customers Revenue with FilteringCallback")
 public class CustomerRevenueFilteringGridView extends VerticalLayout {
 
-    private final ConfigurableFilterDataProvider<CustomerInfo, Void, String> dataProvider;
+    private Grid<CustomerInfo> grid;
+    private CustomerRepository repo;
 
     public CustomerRevenueFilteringGridView(CustomerRepository customerRepository) {
+        repo = customerRepository;
+
         setHeightFull();
-
-        CallbackDataProvider<CustomerInfo, String> callbackDataProvider = DataProvider.fromFilteringCallbacks(
-                query -> customerRepository.findAllCustomersWithRevenue(
-                        PageRequest.of(query.getPage(), query.getPageSize(), toSpringDataSort(query)), query.getFilter().orElse("")).stream(),
-                query -> customerRepository.countAllByLastnameLikeOrFirstnameLike(query.getFilter().orElse("")));
-
-        dataProvider = callbackDataProvider.withConfigurableFilter();
 
         var filter = new TextField();
         filter.setValueChangeMode(ValueChangeMode.LAZY);
         filter.setPlaceholder("Search");
 
-        filter.addValueChangeListener(event -> dataProvider.setFilter(event.getValue()));
+        filter.addValueChangeListener(e->bindData(e.getValue()));
 
         add(filter);
 
-        var grid = new Grid<CustomerInfo>();
+        grid = new Grid<>();
         grid.setHeightFull();
 
         grid.addColumn(CustomerInfo::id).setHeader("ID").setSortable(true).setSortProperty("id");
@@ -48,9 +41,17 @@ public class CustomerRevenueFilteringGridView extends VerticalLayout {
         grid.addColumn(CustomerInfo::lastname).setHeader("Last Name").setSortable(true).setSortProperty("lastname");
         grid.addColumn(CustomerInfo::revenue).setHeader("Revenue");
 
-        grid.setDataProvider(dataProvider);
+        bindData("");
 
         add(grid);
+
+    }
+
+    public void bindData(String filter) {
+        grid.setItems(
+                query -> repo.findAllCustomersWithRevenue(
+                PageRequest.of(query.getPage(), query.getPageSize(), toSpringDataSort(query)), filter).stream(),
+                query -> repo.countAllByLastnameLikeOrFirstnameLike(filter));
     }
 
 }
